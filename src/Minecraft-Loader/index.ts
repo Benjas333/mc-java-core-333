@@ -105,7 +105,7 @@ export default class Loader extends EventEmitter {
 			return;
 		}
 
-		const result = await loaderFunc.call(this, Loader);
+		const result = await loaderFunc.call(this, LoaderData);
 		if (result.error) {
 			this.emit('error', result);
 			return;
