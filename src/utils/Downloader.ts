@@ -221,7 +221,7 @@ export default class Downloader extends EventEmitter {
 			const testURL = `${mirror}/${baseURL}`;
 			const res = await this.checkURL(testURL);
 
-			if (res === false || res.status !== 200) continue;
+			if (res === false || res.status !== 200 || !res.size) continue;
 			return {
 				url: testURL,
 				size: res.size,
