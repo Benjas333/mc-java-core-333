@@ -9,14 +9,14 @@
 import fs from 'fs';
 import nodeFetch from 'node-fetch';
 import { EventEmitter } from 'events';
-import https from 'https';
-import dns from 'dns';
+// import https from 'https';
+// import dns from 'dns';
 
-export const IPv4Agent = new https.Agent({
-	lookup: (hostname, options, callback) => {
-		dns.lookup(hostname, { family: 4 }, callback);
-	}
-});
+// export const IPv4Agent = new https.Agent({
+// 	lookup: (hostname, options, callback) => {
+// 		dns.lookup(hostname, { family: 4 }, callback);
+// 	}
+// });
 
 /**
  * Describes a single file to be downloaded by the Downloader class.
