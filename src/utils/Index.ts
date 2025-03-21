@@ -119,37 +119,44 @@ function isold(json: MinecraftVersionJSON): boolean {
  * @param type A string representing the loader type
  */
 function loader(type: string) {
-	if (type === 'forge') {
-		return {
-			metaData: 'https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json',
-			meta: 'https://files.minecraftforge.net/net/minecraftforge/forge/${build}/meta.json',
-			promotions: 'https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json',
-			install: 'https://maven.minecraftforge.net/net/minecraftforge/forge/${version}/forge-${version}-installer',
-			universal: 'https://maven.minecraftforge.net/net/minecraftforge/forge/${version}/forge-${version}-universal',
-			client: 'https://maven.minecraftforge.net/net/minecraftforge/forge/${version}/forge-${version}-client'
-		};
-	} else if (type === 'neoforge') {
-		return {
-			legacyMetaData: 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/forge',
-			metaData: 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge',
-			legacyInstall: 'https://maven.neoforged.net/net/neoforged/forge/${version}/forge-${version}-installer.jar',
-			install: 'https://maven.neoforged.net/net/neoforged/neoforge/${version}/neoforge-${version}-installer.jar'
-		};
-	} else if (type === 'fabric') {
-		return {
-			metaData: 'https://meta.fabricmc.net/v2/versions',
-			json: 'https://meta.fabricmc.net/v2/versions/loader/${version}/${build}/profile/json'
-		};
-	} else if (type === 'legacyfabric') {
-		return {
-			metaData: 'https://meta.legacyfabric.net/v2/versions',
-			json: 'https://meta.legacyfabric.net/v2/versions/loader/${version}/${build}/profile/json'
-		};
-	} else if (type === 'quilt') {
-		return {
-			metaData: 'https://meta.quiltmc.org/v3/versions',
-			json: 'https://meta.quiltmc.org/v3/versions/loader/${version}/${build}/profile/json'
-		};
+	switch (type) {
+		case 'forge':
+			return {
+				metaData: 'https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json',
+				meta: 'https://files.minecraftforge.net/net/minecraftforge/forge/${build}/meta.json',
+				promotions: 'https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json',
+				install: 'https://maven.minecraftforge.net/net/minecraftforge/forge/${version}/forge-${version}-installer',
+				universal: 'https://maven.minecraftforge.net/net/minecraftforge/forge/${version}/forge-${version}-universal',
+				client: 'https://maven.minecraftforge.net/net/minecraftforge/forge/${version}/forge-${version}-client'
+			};
+		case 'neoforge':
+			return {
+				legacyMetaData: 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/forge',
+				metaData: 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge',
+				legacyInstall: 'https://maven.neoforged.net/net/neoforged/forge/${version}/forge-${version}-installer.jar',
+				install: 'https://maven.neoforged.net/net/neoforged/neoforge/${version}/neoforge-${version}-installer.jar'
+			};
+		case 'fabric':
+			return {
+				metaData: [
+					'https://meta.fabricmc.net/v2/versions',
+					'https://meta2.fabricmc.net/v2/versions',
+					'https://meta3.fabricmc.net/v2/versions'
+				],
+				json: 'https://meta.fabricmc.net/v2/versions/loader/${version}/${build}/profile/json'
+			};
+		case 'legacyfabric':
+			return {
+				metaData: 'https://meta.legacyfabric.net/v2/versions',
+				json: 'https://meta.legacyfabric.net/v2/versions/loader/${version}/${build}/profile/json'
+			};
+		case 'quilt':
+			return {
+				metaData: 'https://meta.quiltmc.org/v3/versions',
+				json: 'https://meta.quiltmc.org/v3/versions/loader/${version}/${build}/profile/json'
+			};
+		default:
+			return undefined;
 	}
 	// If none match, return undefined
 }
