@@ -15,6 +15,7 @@ An autistic fork because I didn't liked the og code.
     4. XboxAccount value is now optional (a whole auth request just for 3 vars (?)).
         1. **Added doIncludeXboxAccount param (default: true).**
     5. xsts login now includes better error messages in case of XErr code.
+    6. xsts login now returns error properly in case of XErr code.
     - getAuth()
         1. **Added doRemoveCookies param (default: true).**
 
@@ -25,16 +26,20 @@ An autistic fork because I didn't liked the og code.
         2. Added better check event emitter feedback.
         3. Priority is given to downloading from the official links first, if provided, and then from the mirrors (instead of the other way around).
         4. Fixed not reaching on error event.
-        5. Redownloading for corrupted/incomplete libraries.
+        5. Re-downloading for corrupted/incomplete libraries.
     - patchForge()
         1. General improvements.
         2. Fixed not reaching on error event.
+- [FabricMC](src/Minecraft-Loader/loader/fabric/fabric.ts)
+    - downloadJson()
+        1. Forced fabric metadata request to use IPv4 (to prevent ETIMEDOUT in some clients).
 - [Loader](src/Minecraft-Loader/index.ts)
     - install()
         1. Improved if conditionals with just an object.
     - forge()
         1. General improvements.
 - [download](src/utils/Downloader.ts)
+    1. Added IPv4Agent constant here so is reusable in other loaders.
     - checkMirror()
         1. Minor changes.
         2. Added check if response.size is an actual number.
