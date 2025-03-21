@@ -281,6 +281,7 @@ export default class Microsoft {
 		}).then(res => res.json()).catch(err => { return { error: err } });
 		if (xsts.error || xsts.XErr) return {
 			...xsts,
+			error: xsts.error || xsts.XErr,
 			errorType: "xsts - Minecraft API",
 			errorMessage: xsts.XErr ? await knownTokenErrors(xsts.XErr) : 'No XErr code provided.'
 		};
