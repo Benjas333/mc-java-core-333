@@ -3,6 +3,7 @@
  * https://creativecommons.org/licenses/by-nc/4.0/
  *
  * Original author: Luuxis
+ * Fork author: Benjas333
  */
 
 import { EventEmitter } from 'events';
@@ -11,7 +12,7 @@ import path from 'path';
 import nodeFetch from 'node-fetch';
 
 import { getPathLibraries } from '../../../utils/Index.js';
-import Downloader from '../../../utils/Downloader.js';
+import Downloader, { IPv4Agent } from '../../../utils/Downloader.js';
 
 /**
  * Represents the options needed by the FabricMC class.
@@ -96,7 +97,7 @@ export default class FabricMC extends EventEmitter {
 		let buildInfo: { version: string; stable: boolean } | undefined;
 
 		// Fetch the metadata
-		let response = await nodeFetch(Loader.metaData);
+		let response = await nodeFetch(Loader.metaData, { agent: IPv4Agent });
 		let metaData: MetaData = await response.json();
 
 		// Check if the Minecraft version is supported
