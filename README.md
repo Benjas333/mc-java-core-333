@@ -32,14 +32,15 @@ An autistic fork because I didn't liked the og code.
         2. Fixed not reaching on error event.
 - [FabricMC](src/Minecraft-Loader/loader/fabric/fabric.ts)
     - downloadJson()
-        1. Forced fabric metadata request to use IPv4 (to prevent ETIMEDOUT in some clients).
+        1. ~~Forced fabric metadata request to use IPv4 (to prevent ETIMEDOUT in some clients).~~ **Discarded**
+        2. Added retry metadata request with mirrors.
 - [Loader](src/Minecraft-Loader/index.ts)
     - install()
         1. Improved if conditionals with just an object.
     - forge()
         1. General improvements.
 - [download](src/utils/Downloader.ts)
-    1. Added IPv4Agent constant here so is reusable in other loaders.
+    1. ~~Added IPv4Agent constant here so it is reusable in other loaders.~~ **Discarded**
     - checkMirror()
         1. Minor changes.
         2. Added check if response.size is an actual number.
@@ -59,7 +60,9 @@ An autistic fork because I didn't liked the og code.
     - getFileFromArchive()
         1. Improved info in case of error.
     - skipLibrary()
-        1. Minor changes
+        1. Minor changes.
+    - loader()
+        1. Implemented switch statement.
 
 ### From here on it is the same as in the original README.md lol
 <br>
