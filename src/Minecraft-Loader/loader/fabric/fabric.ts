@@ -12,7 +12,7 @@ import path from 'path';
 import nodeFetch from 'node-fetch';
 
 import { getPathLibraries } from '../../../utils/Index.js';
-import Downloader, { IPv4Agent } from '../../../utils/Downloader.js';
+import Downloader from '../../../utils/Downloader.js';
 
 /**
  * Represents the options needed by the FabricMC class.
@@ -36,7 +36,7 @@ interface FabricOptions {
  * }
  */
 interface LoaderObject {
-	metaData: string;
+	metaData: string | string[];
 	json: string; // Template string with placeholders like ${version} and ${build}
 }
 
@@ -97,7 +97,20 @@ export default class FabricMC extends EventEmitter {
 		let buildInfo: { version: string; stable: boolean } | undefined;
 
 		// Fetch the metadata
-		let response = await nodeFetch(Loader.metaData, { agent: IPv4Agent });
+		const metaDataUrls = Array.isArray(Loader.metaData) ? Loader.metaData : [Loader.metaData];
+		let response = null;
+		let error = null;
+		for (const metaDataUrl of metaDataUrls) {
+			try {
+				response = await nodeFetch(metaDataUrl);
+				if (response.ok) break;
+				error = response.text;
+			} catch (err) {
+				error = { err };
+			}
+		}
+		if (error) return { error };
+		if (!response) return { error: 'Failed to fetch Fabric metadata' };
 		let metaData: MetaData = await response.json();
 
 		// Check if the Minecraft version is supported
