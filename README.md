@@ -18,6 +18,7 @@ An autistic fork because I didn't liked the og code.
     6. xsts login now returns error properly in case of XErr code.
     - getAuth()
         1. **Added doRemoveCookies param (default: true).**
+    7. Added fetchJSON function with improved logic (place-holder until I update the whole fork [11 commits behind at the moment of writing]).
 
 ### Improved functions until now:
 - [ForgeMC](src/Minecraft-Loader/loader/forge/forge.ts)
