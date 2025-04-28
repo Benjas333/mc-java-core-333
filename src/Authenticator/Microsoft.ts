@@ -246,8 +246,9 @@ export default class Microsoft {
 	 */
 	private async getAccount(oauth2: any, doIncludeXboxAccount: boolean = this.doIncludeXboxAccount): Promise<AuthResponse | AuthError> {
 		// 1. Authenticate with Xbox Live
-		const xboxLive = await nodeFetch("https://user.auth.xboxlive.com/user/authenticate", {
-			method: "post",
+		const xbox_live = await this.fetchJSON("https://user.auth.xboxlive.com/user/authenticate", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", Accept: "application/json" },
 			body: JSON.stringify({
 				Properties: {
 					AuthMethod: "RPS",
@@ -257,15 +258,14 @@ export default class Microsoft {
 				RelyingParty: "http://auth.xboxlive.com",
 				TokenType: "JWT"
 			}),
-			headers: { "Content-Type": "application/json", Accept: "application/json" },
-		}).then(res => res.json()).catch(err => { return { error: err } });
-		if (xboxLive.error) return {
-			...xboxLive,
+		});
+		if (xbox_live.error) return {
+			...xbox_live,
 			errorType: "Xbox Live Authentication"
-		};
+		}
 
 		// 2. Authorize with XSTS for Minecraft services
-		const xsts = await nodeFetch("https://xsts.auth.xboxlive.com/xsts/authorize", {
+		const xsts = await this.fetchJSON("https://xsts.auth.xboxlive.com/xsts/authorize", {
 			method: "POST",
 			headers: {
 				'Content-Type': 'application/json',
@@ -273,12 +273,12 @@ export default class Microsoft {
 			body: JSON.stringify({
 				Properties: {
 					SandboxId: "RETAIL",
-					UserTokens: [xboxLive.Token]
+					UserTokens: [xbox_live.Token]
 				},
 				RelyingParty: "rp://api.minecraftservices.com/",
 				TokenType: "JWT"
 			})
-		}).then(res => res.json()).catch(err => { return { error: err } });
+		});
 		if (xsts.error || xsts.XErr) return {
 			...xsts,
 			error: xsts.error || xsts.XErr,
@@ -287,32 +287,35 @@ export default class Microsoft {
 		};
 
 		// 5. Login with Xbox token to get a Minecraft token
-		const mcLogin = await nodeFetch("https://api.minecraftservices.com/authentication/login_with_xbox", {
+		const mcLogin = await this.fetchJSON("https://api.minecraftservices.com/authentication/login_with_xbox", {
 			method: "POST",
 			headers: {
 				'Content-Type': 'application/json',
 			},
-			body: JSON.stringify({ identityToken: `XBL3.0 x=${xboxLive.DisplayClaims.xui[0].uhs};${xsts.Token}` })
-		}).then(res => res.json()).catch(err => { return { error: err } });
+			body: JSON.stringify({
+				identityToken: `XBL3.0 x=${xbox_live.DisplayClaims.xui[0].uhs};${xsts.Token}`
+			})
+		});
 		if (mcLogin.error) return {
 			...mcLogin,
 			errorType: "Minecraft Login"
 		};
 
 		// 6. Check if the account has purchased Minecraft
-		const hasGame = await nodeFetch("https://api.minecraftservices.com/entitlements/mcstore", {
+		const hasGame = await this.fetchJSON("https://api.minecraftservices.com/entitlements/mcstore", {
 			method: "GET",
 			headers: {
 				Authorization: `Bearer ${mcLogin.access_token}`
 			}
-		}).then(res => res.json());
-
-		if (!hasGame.items?.find((i: any) => i.name === "product_minecraft" || i.name === "game_minecraft")) {
-			return {
-				error: "You don't own the game",
-				errorType: "game"
-			};
-		}
+		});
+		if (hasGame.error) return {
+			...hasGame,
+			errorType: "Minecraft Entitlements"
+		};
+		if (!hasGame.items?.find((i: any) => i.name === "product_minecraft" || i.name === "game_minecraft")) return {
+			error: "You don't own the game",
+			errorType: "game"
+		};
 
 		// 7. Fetch the user profile (skins, capes, etc.)
 		const profile = await this.getProfile(mcLogin);
@@ -340,7 +343,7 @@ export default class Microsoft {
 			}
 		};
 		if (doIncludeXboxAccount) {
-			response.xboxAccount = await this.getXboxAccount(xboxLive.Token);
+			response.xboxAccount = await this.getXboxAccount(xbox_live.Token);
 		}
 		return response;
 	}
@@ -408,5 +411,33 @@ export default class Microsoft {
 			gamertag: xboxAccount.DisplayClaims.xui[0].gtg,
 			ageGroup: xboxAccount.DisplayClaims.xui[0].agg,
 		};
+	}
+
+	/**
+	 * A helper method to perform fetch and parse JSON.
+	 * @param url     The endpoint URL.
+	 * @param options Fetch options (method, headers, body, etc.).
+	 * @returns       The parsed JSON or an object with an error field if something goes wrong.
+	 */
+	private async fetchJSON(url: string, options: Record<string, any>): Promise<any> {
+		try {
+			const response = await fetch(url, options);
+
+			if (!response.ok) {
+				const errorText = await response.text();
+				throw new Error(`HTTP error: ${response.status}: ${errorText}`);
+			}
+
+			const content_type = response.headers.get('content-type') || '';
+			if (!content_type.includes('application/json')) {
+				const body = await response.text();
+				throw new Error(`Unexpected response (${content_type}): ${body}`);
+			}
+
+			const data = await response.json();
+			return data;
+		} catch (err: any) {
+			return { error: err.message || err};
+		}
 	}
 }
