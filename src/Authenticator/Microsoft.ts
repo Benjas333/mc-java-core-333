@@ -322,7 +322,7 @@ export default class Microsoft {
 		if ('error' in profile) return {
 			...profile,
 			errorType: "profile"
-		}
+		};
 
 		let response: AuthResponse = {
 			access_token: mcLogin.access_token,
@@ -356,13 +356,16 @@ export default class Microsoft {
 	 * @returns       The user's Minecraft profile or an error object.
 	 */
 	public async getProfile(mcLogin: { access_token: string }): Promise<MinecraftProfile | AuthError> {
-		const profile = await nodeFetch("https://api.minecraftservices.com/minecraft/profile", {
+		const profile = await this.fetchJSON("https://api.minecraftservices.com/minecraft/profile", {
 			method: "GET",
 			headers: {
 				'Authorization': `Bearer ${mcLogin.access_token}`
 			}
-		}).then(res => res.json()).catch(err => { return { error: err } });;
-		if (profile.error) return profile;
+		});
+		if (profile.error) return {
+			...profile,
+			errorType: "Minecraft Profile"
+		};
 
 		for (const skin of profile.skins || []) {
 			if (skin.url) skin.base64 = `data:image/png;base64,${await getBase64(skin.url)}`
@@ -386,7 +389,7 @@ export default class Microsoft {
 	 */
 	private async getXboxAccount(accessToken: string): Promise<XboxAccount | AuthError> {
 		// 3. Authorize for the standard Xbox Live realm (useful for xuid/gamertag)
-		let xboxAccount = await nodeFetch("https://xsts.auth.xboxlive.com/xsts/authorize", {
+		let xboxAccount = await this.fetchJSON("https://xsts.auth.xboxlive.com/xsts/authorize", {
 			method: "POST",
 			headers: {
 				'Content-Type': 'application/json',
@@ -399,13 +402,12 @@ export default class Microsoft {
 				RelyingParty: "http://xboxlive.com",
 				TokenType: "JWT"
 			})
-		}).then(res => res.json()).catch(err => { return { error: err } });
-		if (xboxAccount.error) {
-			return {
-				...xboxAccount,
-				errorType: "Get Xbox Account"
-			};
-		}
+		});
+		if (xboxAccount.error) return {
+			...xboxAccount,
+			errorType: "Get Xbox Account"
+		};
+
 		return {
 			xuid: xboxAccount.DisplayClaims.xui[0].xid,
 			gamertag: xboxAccount.DisplayClaims.xui[0].gtg,
@@ -415,29 +417,65 @@ export default class Microsoft {
 
 	/**
 	 * A helper method to perform fetch and parse JSON.
-	 * @param url     The endpoint URL.
-	 * @param options Fetch options (method, headers, body, etc.).
-	 * @returns       The parsed JSON or an object with an error field if something goes wrong.
+	 * @param url        The endpoint URL.
+	 * @param options    Fetch options (method, headers, body, etc.).
+	 * @param maxRetries Maximum number of retry attempts (default: 5).
+	 * @returns          The parsed JSON or an object with an error field if something goes wrong.
 	 */
-	private async fetchJSON(url: string, options: Record<string, any>): Promise<any> {
-		try {
-			const response = await fetch(url, options);
+	private async fetchJSON(
+		url: string,
+		options: Record<string, any>,
+		maxRetries: number = 5
+	): Promise<any> {
+		let attempt = 0;
+		let last_error: any;
+		while (attempt < maxRetries) {
+			try {
+				const response = await fetch(url, options);
+	
+				if (!response.ok && response.status !== 429) {
+					const errorText = await response.text();
+					throw new Error(`HTTP error: ${response.status}: ${errorText}`);
+				}
+				
+				if (response.status === 429) {
+					if (attempt >= maxRetries) {
+						const body = await response.text().catch(() => '');
+						throw new Error(`HTTP 429: rate limit exceeded after ${maxRetries} retries: ${body}`);
+					}
 
-			if (!response.ok) {
-				const errorText = await response.text();
-				throw new Error(`HTTP error: ${response.status}: ${errorText}`);
+					const retry_after = response.headers.get('Retry-After');
+					let delay_sec = retry_after ? parseInt(retry_after, 10) : Math.pow(2, attempt);
+					if (isNaN(delay_sec)) {
+						const then = new Date(retry_after).getTime();
+						if (then) {
+							delay_sec = Math.max(0, Math.floor((then - Date.now()) / 1000));
+						} else {
+							delay_sec = Math.pow(2, attempt);
+						}
+					}
+					if (delay_sec <= 0) {
+						delay_sec = Math.pow(2, attempt);
+					}
+					await new Promise(resolve => setTimeout(resolve, delay_sec * 1000));
+					attempt++;
+					continue;
+				}
+
+				const content_type = response.headers.get('content-type') || '';
+				if (!content_type.includes('application/json')) {
+					const body = await response.text();
+					throw new Error(`Unexpected response (${content_type}): ${body}`);
+				}
+	
+				const data = await response.json();
+				return data;
+			} catch (err: any) {
+				last_error = err;
+				if (attempt >= maxRetries || (err.message && !err.message.includes('429'))) break;
+				attempt++;
 			}
-
-			const content_type = response.headers.get('content-type') || '';
-			if (!content_type.includes('application/json')) {
-				const body = await response.text();
-				throw new Error(`Unexpected response (${content_type}): ${body}`);
-			}
-
-			const data = await response.json();
-			return data;
-		} catch (err: any) {
-			return { error: err.message || err};
 		}
+		return { error:last_error.message ||last_error};
 	}
 }
