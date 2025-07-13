@@ -3,6 +3,7 @@
  * https://creativecommons.org/licenses/by-nc/4.0/
  *
  * Original author: Luuxis
+ * Fork author: Benjas333
  */
 
 import { EventEmitter } from 'events';
@@ -268,13 +269,13 @@ export default class Launch extends EventEmitter {
 		if (data.error) return this.emit('error', data);
 		let { minecraftJson, minecraftLoader, minecraftVersion, minecraftJava } = data;
 
-		let minecraftArguments: any = await new argumentsMinecraft(this.options).GetArguments(minecraftJson, minecraftLoader);
-		if (minecraftArguments.error) return this.emit('error', minecraftArguments);
+		let minecraftArguments = await new argumentsMinecraft(this.options).GetArguments(minecraftJson, minecraftLoader);
+		if ('error' in minecraftArguments) return this.emit('error', minecraftArguments);
 
-		let loaderArguments: any = await new loaderMinecraft(this.options).GetArguments(minecraftLoader, minecraftVersion);
-		if (loaderArguments.error) return this.emit('error', loaderArguments);
+		let loaderArguments = await new loaderMinecraft(this.options).GetArguments(minecraftLoader, minecraftVersion, minecraftJson);
+		if ('error' in loaderArguments) return this.emit('error', loaderArguments);
 
-		let Arguments: any = [
+		let Arguments: string[] = [
 			...minecraftArguments.jvm,
 			...minecraftArguments.classpath,
 			...loaderArguments.jvm,
@@ -283,7 +284,7 @@ export default class Launch extends EventEmitter {
 			...loaderArguments.game
 		]
 
-		let java: any = this.options.java.path ? this.options.java.path : minecraftJava.path;
+		let java: string = this.options.java.path ? this.options.java.path : minecraftJava.path;
 		let logs = this.options.instance ? `${this.options.path}/instances/${this.options.instance}` : this.options.path;
 		if (!fs.existsSync(logs)) fs.mkdirSync(logs, { recursive: true });
 
