@@ -145,7 +145,7 @@ export default class Loader extends EventEmitter {
 		const installer: any = await forge.downloadInstaller(LoaderData);
 		if (installer.error) return installer; // e.g., { error: "..." }
 
-		const profile = await forge.extractProfile(installer.filePath);
+		const profile: any = await forge.extractProfile(installer.filePath);
 		if (profile.error) return profile;
 		
 		// Write the version JSON to disk
