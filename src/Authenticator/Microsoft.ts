@@ -7,7 +7,7 @@
  * Fork author: Benjas333
  */
 
-import nodeFetch from 'node-fetch';
+import { Buffer } from 'node:buffer';
 import crypto from 'crypto';
 
 // Possible client types (Electron, NW.js, or terminal usage)
@@ -70,8 +70,9 @@ export interface AuthResponse {
  * @returns   A string of the image in base64 format.
  */
 async function getBase64(url: string): Promise<string> {
-	const response = await nodeFetch(url);
-	const buffer = await response.buffer();
+	const response = await fetch(url);
+	const arrayBuffer = await response.arrayBuffer();
+	const buffer = Buffer.from(arrayBuffer);
 	return buffer.toString('base64');
 }
 
@@ -185,19 +186,20 @@ export default class Microsoft {
 	 * @returns    The authenticated user data or an error object.
 	 */
 	private async exchangeCodeForToken(code: string): Promise<AuthResponse | AuthError> {
-		let oauth2 = await nodeFetch("https://login.live.com/oauth20_token.srf", {
-			method: "POST",
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded'
-			},
-			body: `client_id=${this.client_id}&code=${code}&grant_type=authorization_code&redirect_uri=https://login.live.com/oauth20_desktop.srf`
-		}).then(res => res.json()).catch(err => { return { error: err } });
-		if (oauth2.error) return {
-			...oauth2,
-			errorType: "oauth2"
-		};
+		try {
+			const response = await fetch('https://login.live.com/oauth20_token.srf', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: `client_id=${this.client_id}&code=${code}&grant_type=authorization_code&redirect_uri=https://login.live.com/oauth20_desktop.srf`
+			});
+			const oauth2 = await response.json();
 
-		return await this.getAccount(oauth2);
+			if (oauth2.error) return { error: oauth2.error, errorType: 'oauth2', ...oauth2 };
+
+			return await this.getAccount(oauth2);
+		} catch (error) {
+			return { error: error.message || error, errorType: 'network' };
+		}
 	}
 
 	/**
@@ -224,19 +226,23 @@ export default class Microsoft {
 			return acc;
 		}
 
-		const oauth2 = await nodeFetch("https://login.live.com/oauth20_token.srf", {
-			method: "POST",
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded'
-			},
-			body: `grant_type=refresh_token&client_id=${this.client_id}&refresh_token=${acc.refresh_token}`
-		}).then(res => res.json()).catch(err => { return { error: err } });
-		if (oauth2.error) return {
-			...oauth2,
-			errorType: "oauth2 refresh"
-		};
+		// Otherwise, refresh the token
+		try {
+			const response = await fetch('https://login.live.com/oauth20_token.srf', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: `grant_type=refresh_token&client_id=${this.client_id}&refresh_token=${acc.refresh_token}`
+			});
+			const oauth2 = await response.json();
 
-		return await this.getAccount(oauth2);
+			if (oauth2.error) {
+				return { error: oauth2.error, errorType: 'oauth2 refresh', ...oauth2 };
+			}
+			// Retrieve account data with the new tokens
+			return this.getAccount(oauth2);
+		} catch (err: any) {
+			return { error: err.message || err, errorType: 'network' };
+		}
 	}
 
 	/**
@@ -319,10 +325,7 @@ export default class Microsoft {
 
 		// 7. Fetch the user profile (skins, capes, etc.)
 		const profile = await this.getProfile(mcLogin);
-		if ('error' in profile) return {
-			...profile,
-			errorType: "profile"
-		};
+		if ('error' in profile) return profile;
 
 		let response: AuthResponse = {
 			access_token: mcLogin.access_token,
@@ -356,10 +359,10 @@ export default class Microsoft {
 	 * @returns       The user's Minecraft profile or an error object.
 	 */
 	public async getProfile(mcLogin: { access_token: string }): Promise<MinecraftProfile | AuthError> {
-		const profile = await this.fetchJSON("https://api.minecraftservices.com/minecraft/profile", {
-			method: "GET",
+		const profile = await this.fetchJSON('https://api.minecraftservices.com/minecraft/profile', {
+			method: 'GET',
 			headers: {
-				'Authorization': `Bearer ${mcLogin.access_token}`
+				Authorization: `Bearer ${mcLogin.access_token}`
 			}
 		});
 		if (profile.error) return {
@@ -367,11 +370,16 @@ export default class Microsoft {
 			errorType: "Minecraft Profile"
 		};
 
-		for (const skin of profile.skins || []) {
-			if (skin.url) skin.base64 = `data:image/png;base64,${await getBase64(skin.url)}`
+		// Convert each skin and cape to base64
+		if (Array.isArray(profile.skins)) {
+			for (const skin of profile.skins) {
+				if (skin.url) skin.base64 = `data:image/png;base64,${await getBase64(skin.url)}`;
+			}
 		}
-		for (const cape of profile.capes || []) {
-			if (cape.url) cape.base64 = `data:image/png;base64,${await getBase64(cape.url)}`
+		if (Array.isArray(profile.capes)) {
+			for (const cape of profile.capes) {
+				if (cape.url) cape.base64 = `data:image/png;base64,${await getBase64(cape.url)}`;
+			}
 		}
 
 		return {
@@ -476,6 +484,6 @@ export default class Microsoft {
 				attempt++;
 			}
 		}
-		return { error:last_error.message ||last_error};
+		return { error: last_error.message || last_error };
 	}
 }

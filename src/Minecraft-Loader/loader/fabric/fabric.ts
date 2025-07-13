@@ -9,7 +9,6 @@
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
-import nodeFetch from 'node-fetch';
 
 import { getPathLibraries } from '../../../utils/Index.js';
 import Downloader from '../../../utils/Downloader.js';
@@ -102,7 +101,7 @@ export default class FabricMC extends EventEmitter {
 		let error = null;
 		for (const metaDataUrl of metaDataUrls) {
 			try {
-				response = await nodeFetch(metaDataUrl);
+				response = await fetch(metaDataUrl);
 				if (response.ok) break;
 				error = response.text;
 			} catch (err) {
@@ -140,7 +139,7 @@ export default class FabricMC extends EventEmitter {
 
 		// Fetch the Fabric loader JSON
 		try {
-			const result = await nodeFetch(url);
+			const result = await fetch(url);
 			const fabricJson: FabricJSON = await result.json();
 			return fabricJson;
 		} catch (err: any) {

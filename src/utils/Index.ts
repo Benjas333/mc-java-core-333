@@ -8,8 +8,8 @@
 
 import crypto from 'crypto';
 import fs from 'fs';
-import AdmZip from 'adm-zip';
-import path from 'path';
+import { Readable } from 'node:stream';
+import Unzipper from './unzipper.js';
 
 // This interface defines the structure of a Minecraft library rule.
 interface LibraryRule {
@@ -74,7 +74,8 @@ function getPathLibraries(main: string, nativeString?: string, forceExt?: string
 
 	return {
 		path: pathLib,
-		name: `${libSplit[1]}-${finalFileName}`
+		name: `${libSplit[1]}-${finalFileName}`,
+		version: libSplit[2],
 	};
 }
 
@@ -133,8 +134,8 @@ function loader(type: string) {
 			return {
 				legacyMetaData: 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/forge',
 				metaData: 'https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge',
-				legacyInstall: 'https://maven.neoforged.net/net/neoforged/forge/${version}/forge-${version}-installer.jar',
-				install: 'https://maven.neoforged.net/net/neoforged/neoforge/${version}/neoforge-${version}-installer.jar'
+				legacyInstall: 'https://maven.neoforged.net/releases/net/neoforged/forge/${version}/forge-${version}-installer.jar',
+				install: 'https://maven.neoforged.net/releases/net/neoforged/neoforge/${version}/neoforge-${version}-installer.jar'
 			};
 		case 'fabric':
 			return {
@@ -174,37 +175,37 @@ const mirrors = [
 
 /**
  * Reads a .jar or .zip file, returning specific entries or listing file entries in the archive.
- * Uses adm-zip under the hood.
  *
  * @param jar    Full path to the jar/zip file
  * @param file   The file entry to extract data from (e.g., "install_profile.json"). If null, returns all entries or partial lists.
  * @param prefix A path prefix filter (e.g., "maven/org/lwjgl/") if you want a list of matching files instead of direct extraction
  * @returns      A buffer or an array of { name, data }, or a list of filenames if prefix is given
  */
-async function getFileFromArchive(jar: string, file: string | null = null, prefix: string | null = null): Promise<any> {
+async function getFileFromArchive(jar: string, file: string | null = null, prefix: string | null = null, includeDirs: boolean = false): Promise<any> {
 	const result: any[] = [];
-	let zip: AdmZip | null = null;
+	let zip: Unzipper | null = null;
 	try {
-		zip = new AdmZip(jar);
+		zip = new Unzipper(jar);
 	} catch (error) {
+		// TODO: This was intended to make a more readable error message because of the library used, but Luuxis now added his own Unzipper class, so I have to test the error message
 		throw new Error(`Failed to open '${file}' as ZIP: ${error.message || error}`);
 	}
 	const entries = zip.getEntries();
 
 	return new Promise((resolve) => {
 		for (const entry of entries) {
-			if (!entry.isDirectory && !prefix) {
+			if (includeDirs ? !prefix : (!entry.isDirectory && !prefix)) {
 				// If no prefix is given, either return a specific file if 'file' is set,
 				// or accumulate all entries if 'file' is null
 				if (entry.entryName === file) {
 					return resolve(entry.getData());
 				} else if (!file) {
-					result.push({ name: entry.entryName, data: entry.getData() });
+					result.push({ name: entry.entryName, data: entry.getData(), isDirectory: entry.isDirectory });
 				}
 			}
 
 			// If a prefix is given, collect all entry names under that prefix
-			if (!entry.isDirectory && prefix && entry.entryName.includes(prefix)) {
+			if (!entry.isDirectory && entry.entryName.includes(prefix)) {
 				result.push(entry.entryName);
 			}
 		}
@@ -216,28 +217,6 @@ async function getFileFromArchive(jar: string, file: string | null = null, prefi
 
 		// Otherwise, resolve the array of results
 		resolve(result);
-	});
-}
-
-/**
- * Creates a new ZIP buffer by combining multiple file entries (name, data),
- * optionally ignoring entries containing a certain string (e.g. "META-INF").
- *
- * @param files   An array of { name, data } objects to include in the new zip
- * @param ignored A substring to skip any matching files
- * @returns       A buffer containing the newly created ZIP
- */
-async function createZIP(files: { name: string; data: Buffer }[], ignored: string | null = null): Promise<Buffer> {
-	const zip = new AdmZip();
-
-	return new Promise((resolve) => {
-		for (const entry of files) {
-			if (ignored && entry.name.includes(ignored)) {
-				continue;
-			}
-			zip.addFile(entry.name, entry.data);
-		}
-		resolve(zip.toBuffer());
 	});
 }
 
@@ -284,6 +263,29 @@ function skipLibrary(lib: MinecraftLibrary): boolean {
 	return shouldSkip;
 }
 
+function fromAnyReadable(webStream: ReadableStream<Uint8Array>): import('node:stream').Readable {
+	let NodeReadableStreamCtor: typeof ReadableStream | undefined;
+	if (!NodeReadableStreamCtor && typeof globalThis?.navigator === 'undefined') {
+		import('node:stream/web').then((mod) => { NodeReadableStreamCtor = mod.ReadableStream; });
+	}
+	if (NodeReadableStreamCtor && webStream instanceof NodeReadableStreamCtor && typeof (Readable as any).fromWeb === 'function') {
+		return Readable.fromWeb(webStream as any);
+	}
+
+	const nodeStream = new Readable({ read() { } });
+	const reader = webStream.getReader();
+
+	(function pump() {
+		reader.read().then(({ done, value }) => {
+			if (done) return nodeStream.push(null);
+			nodeStream.push(Buffer.from(value));
+			pump();
+		}).catch(err => nodeStream.destroy(err));
+	})();
+
+	return nodeStream;
+}
+
 // Export all utility functions and constants
 export {
 	getPathLibraries,
@@ -292,6 +294,6 @@ export {
 	loader,
 	mirrors,
 	getFileFromArchive,
-	createZIP,
-	skipLibrary
+	skipLibrary,
+	fromAnyReadable
 };

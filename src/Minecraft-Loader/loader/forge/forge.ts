@@ -10,14 +10,12 @@
 import fs from 'fs';
 import path from 'path';
 import { EventEmitter } from 'events';
-import nodeFetch from 'node-fetch';
 
 import {
 	getPathLibraries,
 	getFileHash,
 	mirrors,
 	getFileFromArchive,
-	createZIP,
 	skipLibrary
 } from '../../../utils/Index.js';
 
@@ -123,7 +121,7 @@ export default class ForgeMC extends EventEmitter {
 	 */
 	public async downloadInstaller(Loader: any): Promise<DownloadInstallerResult> {
 		// Fetch metadata for the given Forge version
-		let metaDataList: string[] = await nodeFetch(Loader.metaData)
+		let metaDataList: string[] = await fetch(Loader.metaData)
 			.then(res => res.json())
 			.then(json => json[this.options.loader.version]);
 
@@ -136,12 +134,12 @@ export default class ForgeMC extends EventEmitter {
 
 		// Handle "latest" or "recommended" builds by checking promotions
 		if (this.options.loader.build === 'latest') {
-			let promotions = await nodeFetch(Loader.promotions).then(res => res.json());
+			let promotions = await fetch(Loader.promotions).then(res => res.json());
 			const promoKey = `${this.options.loader.version}-latest`;
 			const promoBuild = promotions.promos[promoKey];
 			build = metaDataList.find(b => b.includes(promoBuild));
 		} else if (this.options.loader.build === 'recommended') {
-			let promotions = await nodeFetch(Loader.promotions).then(res => res.json());
+			let promotions = await fetch(Loader.promotions).then(res => res.json());
 			let promoKey = `${this.options.loader.version}-recommended`;
 			let promoBuild = promotions.promos[promoKey] || promotions.promos[`${this.options.loader.version}-latest`];
 			build = metaDataList.find(b => b.includes(promoBuild));
@@ -158,7 +156,7 @@ export default class ForgeMC extends EventEmitter {
 		}
 
 		// Fetch info about the chosen build from the meta URL
-		const meta = await nodeFetch(Loader.meta.replace(/\${build}/g, chosenBuild)).then(res => res.json());
+		const meta = await fetch(Loader.meta.replace(/\${build}/g, chosenBuild)).then(res => res.json());
 
 		// Determine which classifier to use (installer, client, or universal)
 		const hasInstaller = meta.classifiers.installer;
@@ -185,7 +183,7 @@ export default class ForgeMC extends EventEmitter {
 			return { error: 'Invalid forge installer' };
 		}
 
-		const forgeFolder = path.resolve(this.options.path, 'forge');
+		const forgeFolder = path.resolve(this.options.path, 'libraries/net/minecraftforge/installer');
 		const fileName = `${forgeURL}.${ext}`.split('/').pop()!;
 		const installerPath = path.resolve(forgeFolder, fileName);
 
@@ -404,17 +402,19 @@ export default class ForgeMC extends EventEmitter {
 					emitCheck(lib.name);
 					continue;
 				}
-			} catch (error) {
-				
-			}
+			} catch {}
 			
-			if (!url) return { error: `Impossible to download ${libInfo.name}` };
+			if (!url) {
+				emitCheck(lib.name);
+				this.emit('error', `Library ${libInfo.name} not found`);
+				continue;
+			}
 			totalSize += fileSize;
 			
 			downloadList.push({
 				url: url,
 				folder: libFolder,
-				path: `${libFolder}/${libInfo.name}`,
+				path: libFilePath,
 				type: libInfo.name,
 				size: fileSize
 			});
@@ -483,38 +483,5 @@ export default class ForgeMC extends EventEmitter {
 		};
 		await patcher.patcher(profile, config);
 		return response || true;
-	}
-
-	/**
-	 * For older Forge versions, merges the vanilla Minecraft jar and Forge installer files
-	 * into a single jar. Writes a modified version.json reflecting the new Forge version.
-	 *
-	 * @param id The new version ID (e.g., "forge-1.12.2-14.23.5.2855")
-	 * @param pathInstaller Path to the Forge installer
-	 * @returns A modified version.json with an isOldForge property and a jarPath
-	 */
-	public async createProfile(id: string, pathInstaller: string): Promise<any> {
-		// Gather all entries from the Forge installer and the vanilla JAR
-		const forgeFiles = await getFileFromArchive(pathInstaller);
-		const vanillaJar = await getFileFromArchive(this.options.loader.config.minecraftJar);
-
-		// Combine them, excluding "META-INF" from the final jar
-		const mergedZip = await createZIP([...vanillaJar, ...forgeFiles], 'META-INF');
-
-		// Write the new combined jar to versions/<id>/<id>.jar
-		const destination = path.resolve(this.options.path, 'versions', id);
-		if (!fs.existsSync(destination)) {
-			fs.mkdirSync(destination, { recursive: true });
-		}
-		fs.writeFileSync(path.resolve(destination, `${id}.jar`), mergedZip, { mode: 0o777 });
-
-		// Update the version JSON
-		const profileData = JSON.parse(fs.readFileSync(this.options.loader.config.minecraftJson).toString());
-		profileData.libraries = [];
-		profileData.id = id;
-		profileData.isOldForge = true;
-		profileData.jarPath = path.resolve(destination, `${id}.jar`);
-
-		return profileData;
 	}
 }

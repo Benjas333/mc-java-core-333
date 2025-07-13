@@ -7,8 +7,7 @@
 
 import os from 'os';
 import fs from 'fs';
-import AdmZip from 'adm-zip';
-import nodeFetch from 'node-fetch';
+import { getFileFromArchive } from '../utils/Index.js';
 
 /**
  * Maps Node.js platforms to Mojang's naming scheme for OS in library natives.
@@ -201,7 +200,7 @@ export default class Libraries {
 	public async GetAssetsOthers(url: string | null): Promise<LibraryDownload[]> {
 		if (!url) return [];
 
-		const response = await nodeFetch(url);
+		const response = await fetch(url);
 		const data: CustomAssetItem[] = await response.json();
 
 		const assets: LibraryDownload[] = [];
@@ -248,27 +247,19 @@ export default class Libraries {
 
 		// For each native jar, extract its contents (excluding META-INF)
 		for (const native of natives) {
-			// Load it as a zip
-			const zip = new AdmZip(native);
-			const entries = zip.getEntries();
+			const entries = await getFileFromArchive(native, null, null, true);
+
 
 			for (const entry of entries) {
-				if (entry.entryName.startsWith('META-INF')) {
-					continue;
-				}
+				if (entry.name.startsWith('META-INF')) continue;
 
-				// Create subdirectories if needed
 				if (entry.isDirectory) {
-					fs.mkdirSync(`${nativesFolder}/${entry.entryName}`, { recursive: true, mode: 0o777 });
+					fs.mkdirSync(`${nativesFolder}/${entry.name}`, { recursive: true, mode: 0o777 });
 					continue;
 				}
 
 				// Write the file to the natives folder
-				fs.writeFileSync(
-					`${nativesFolder}/${entry.entryName}`,
-					zip.readFile(entry),
-					{ mode: 0o777 }
-				);
+				fs.writeFileSync(`${nativesFolder}/${entry.name}`, entry.data, { mode: 0o777 });
 			}
 		}
 		return natives;
