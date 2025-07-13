@@ -3,6 +3,7 @@
  * https://creativecommons.org/licenses/by-nc/4.0/
  *
  * Original author: Luuxis
+ * Fork author: Benjas333
  */
 
 import fs from 'fs';
@@ -102,17 +103,21 @@ export default class MinecraftArguments {
 	 * @param versionJson The Minecraft version JSON.
 	 * @param loaderJson  An optional loader JSON (Forge, Fabric, etc.).
 	 */
-	public async GetArguments(versionJson: VersionJSON, loaderJson?: LoaderJSON): Promise<LaunchArguments> {
-		const gameArguments = await this.GetGameArguments(versionJson, loaderJson);
-		const jvmArguments = await this.GetJVMArguments(versionJson);
-		const classpathData = await this.GetClassPath(versionJson, loaderJson);
-
-		return {
-			game: gameArguments,
-			jvm: jvmArguments,
-			classpath: classpathData.classpath,
-			mainClass: classpathData.mainClass
-		};
+	public async GetArguments(versionJson: VersionJSON, loaderJson?: LoaderJSON): Promise<LaunchArguments | { error: any }> {
+		try {
+			const gameArguments = await this.GetGameArguments(versionJson, loaderJson);
+			const jvmArguments = await this.GetJVMArguments(versionJson);
+			const classpathData = await this.GetClassPath(versionJson, loaderJson);
+	
+			return {
+				game: gameArguments,
+				jvm: jvmArguments,
+				classpath: classpathData.classpath,
+				mainClass: classpathData.mainClass
+			};
+		} catch (error) {
+			return { error };
+		}
 	}
 
 	/**
