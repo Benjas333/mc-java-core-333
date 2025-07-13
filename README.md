@@ -65,6 +65,18 @@ An autistic fork because I didn't liked the og code.
         1. Minor changes.
     - loader()
         1. Implemented switch statement.
+- [MinecraftLoader](src/Minecraft/Minecraft-Loader.ts)
+    - GetArguments()
+        1. Fixed not handling errors properly.
+        2. Fixed loaderArguments returning duplicated arguments.
+        3. Added versionJson optional param in order to make the previous fix work.
+- [MinecraftArguments](src/Minecraft/Minecraft-Arguments.ts)
+    - GetArguments()
+        1. Fixed not handling errors properly.
+- [Launch](src/Launch.ts)
+    - start()
+        1. Fixed not handling errors properly.
+        2. Fixed some types.
 
 ### From here on it is the same as in the original README.md lol
 <br>
