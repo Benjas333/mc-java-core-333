@@ -3,12 +3,14 @@
  * https://creativecommons.org/licenses/by-nc/4.0/
  *
  * Original author: Luuxis
+ * Fork author: Benjas333
  */
 
 import { EventEmitter } from 'events';
 import path from 'path';
 // Note: Adjust the import path according to your actual TypeScript setup.
 import LoaderDownloader, { LoaderType } from '../Minecraft-Loader/index.js';
+import { VersionJSON } from './Minecraft-Arguments.js';
 
 /**
  * Describes the loader options, including a path and other configurations.
@@ -133,49 +135,52 @@ export default class MinecraftLoader extends EventEmitter {
 	 * Builds the game and JVM arguments based on the loader's JSON data.
 	 * This may involve placeholder replacements for the main class, library directories, etc.
 	 *
-	 * @param json    The loader JSON previously returned by GetLoader (or null)
-	 * @param version The targeted Minecraft version (used for placeholder substitution)
-	 * @returns       An object with `game`, `jvm`, and an optional `mainClass` property
+	 * @param json        The loader JSON previously returned by GetLoader (or null)
+	 * @param version     The targeted Minecraft version (used for placeholder substitution)
+	 * @param versionJson Optional VersionJSON object for additional context
+	 * @returns           An object with `game`, `jvm`, and an optional `mainClass` property
 	 */
-	public async GetArguments(json: LoaderJSON | null, version: string): Promise<{
+	public async GetArguments(json: LoaderJSON | null, version: string, versionJson?: VersionJSON): Promise<{
 		game: string[];
 		jvm: string[];
 		mainClass?: string;
-	}> {
-		// If no loader JSON is provided, return empty arrays
-		if (json === null) {
-			return { game: [], jvm: [] };
-		}
-
-		const moddedArgs = json.arguments;
-		// If no arguments field is present, return empty arrays
-		if (!moddedArgs) return { game: [], jvm: [] };
-
-		const args: {
-			game?: string[];
-			jvm?: string[];
-			mainClass?: string;
-		} = {};
-
-		if (moddedArgs.game) {
-			args.game = moddedArgs.game;
-		}
-
-		if (moddedArgs.jvm) {
-			// Replace placeholders in the JVM arguments
-			args.jvm = moddedArgs.jvm.map((jvmArg) =>
+	} | { error: any }> {
+		try {
+			// If no loader JSON is provided, return empty arrays
+			if (json === null) return { game: [], jvm: [] };
+	
+			const moddedArgs = json.arguments;
+			// If no arguments field is present, return empty arrays
+			if (!moddedArgs) return { game: [], jvm: [] };
+	
+			const args: {
+				game?: string[];
+				jvm?: string[];
+				mainClass?: string;
+			} = {};
+	
+			args.game = moddedArgs.game?.filter(item => typeof item === 'string') || [];
+			
+			args.jvm = moddedArgs.jvm?.filter(item => typeof item === 'string').map(jvmArg =>
 				jvmArg
 					.replace(/\${version_name}/g, version)
 					.replace(/\${library_directory}/g, `${this.loaderPath}/libraries`)
 					.replace(/\${classpath_separator}/g, process.platform === 'win32' ? ';' : ':')
-			);
-		}
+			) || [];
 
-		args.mainClass = json.mainClass;
-		return {
-			game: args.game || [],
-			jvm: args.jvm || [],
-			mainClass: args.mainClass
-		};
+			if (versionJson && versionJson.arguments) {
+				args.game = args.game.filter(item => !versionJson.arguments.game.includes(item));
+				args.jvm = args.jvm.filter(item => !versionJson.arguments.jvm.includes(item));
+			}
+	
+			args.mainClass = json.mainClass;
+			return {
+				game: args.game,
+				jvm: args.jvm,
+				mainClass: args.mainClass
+			};
+		} catch (error) {
+			return { error };
+		}
 	}
 }
