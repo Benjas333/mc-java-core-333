@@ -1,4 +1,5 @@
 > [!WARNING] Deprecation warning
+> 
 > The purpose of this library was to fix a lot of spaghetti code from the original library and add new features.
 > But around `Apr, 2025` the original repo got its code rewritten.
 > Most of the fixes this library has were applied to the original too, so the amount of benefits from this library reduced.
